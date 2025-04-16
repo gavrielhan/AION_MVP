@@ -34,6 +34,11 @@ conda activate AION
 # Install dependencies
 pip install -r requirements.txt
 ```
+You have to add a .env file with your own API_KEY and API_BASE_URL to start the application. Then you can run
+
+```bash
+python run.py
+```
 
 ## Project Structure
 
@@ -49,7 +54,7 @@ oren/
 
 ## Usage
 
-[Documentation to be added]
+More on the project here
 
 ## License
 
