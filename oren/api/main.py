@@ -1,92 +1,135 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
-from typing import List, Dict, Optional
-import torch
-from pathlib import Path
+import os
+from dotenv import load_dotenv
+import requests
+import json
 
-from ..models.target_ranker import TargetRanker
-from ..data.processor import DataProcessor
+# Load environment variables
+load_dotenv()
 
-app = FastAPI(
-    title="OREN API",
-    description="API for the Optimized Research Engine for Novel target pairs platform",
-    version="0.1.0"
-)
+# Initialize FastAPI app
+app = FastAPI(title="OREN API")
 
-# Initialize models and processors
-data_processor = DataProcessor(data_dir="data")
-model = TargetRanker(input_dim=128)  # Adjust input dimension based on your features
+# Mount static files
+app.mount("/static", StaticFiles(directory="oren/static"), name="static")
 
+# Initialize templates
+templates = Jinja2Templates(directory="oren/templates")
+
+# API configuration
+API_KEY = os.getenv("API_KEY")
+API_BASE_URL = os.getenv("API_BASE_URL")
+
+if not API_KEY or not API_BASE_URL:
+    raise ValueError("API_KEY and API_BASE_URL must be set in .env file")
+
+# Request/Response models
 class TargetPairRequest(BaseModel):
     indication: str
     patient_population: str
     clinical_phenotype: str
-    strategy: str
-    tissue_specificity: Optional[Dict[str, float]] = None
+    targeting_strategy: str
+
+class TargetPair(BaseModel):
+    target1: str
+    target2: str
+    synergy_score: float
+    toxicity_score: float
 
 class TargetPairResponse(BaseModel):
-    target_pairs: List[Dict]
-    mechanistic_explanations: List[str]
-    biomarker_predictions: List[Dict]
-    toxicity_predictions: List[Dict]
+    target_pairs: list[TargetPair]
 
-@app.post("/rank_target_pairs", response_model=TargetPairResponse)
+class ExplanationRequest(BaseModel):
+    target1: str
+    target2: str
+    indication: str
+    patient_population: str
+    clinical_phenotype: str
+
+# Mock data for demonstration
+MOCK_TARGET_PAIRS = [
+    TargetPair(
+        target1="PD-1",
+        target2="CTLA-4",
+        synergy_score=0.85,
+        toxicity_score=0.35
+    ),
+    TargetPair(
+        target1="PD-L1",
+        target2="LAG-3",
+        synergy_score=0.78,
+        toxicity_score=0.42
+    ),
+    TargetPair(
+        target1="TIM-3",
+        target2="TIGIT",
+        synergy_score=0.72,
+        toxicity_score=0.28
+    )
+]
+
+@app.get("/", response_class=HTMLResponse)
+async def read_root(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
+@app.post("/api/rank_target_pairs", response_model=TargetPairResponse)
 async def rank_target_pairs(request: TargetPairRequest):
-    """
-    Rank potential target pairs based on given parameters.
-    """
+    # In a real implementation, this would use the ML model
+    # For now, return mock data
+    return TargetPairResponse(target_pairs=MOCK_TARGET_PAIRS)
+
+@app.post("/api/explain")
+async def explain_target_pair(request: ExplanationRequest):
     try:
-        # Process the request
-        target_pairs = model.rank_target_pairs(
-            target_features=torch.randn(10, 128),  # Replace with actual features
-            indication=request.indication,
-            patient_population=request.patient_population,
-            clinical_phenotype=request.clinical_phenotype,
-            strategy=request.strategy
+        # Prepare the prompt for the LLM
+        prompt = f"""Explain why the target pair {request.target1} and {request.target2} 
+        would be effective for treating {request.indication} in {request.patient_population} 
+        patients with {request.clinical_phenotype}. Include mechanistic rationale and 
+        potential benefits."""
+
+        # Prepare the API request
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {API_KEY}"
+        }
+        
+        payload = {
+            "model": "gpt-4",
+            "messages": [
+                {"role": "system", "content": "You are a biomedical expert explaining drug target pairs."},
+                {"role": "user", "content": prompt}
+            ]
+        }
+
+        # Make the API request
+        response = requests.post(
+            f"{API_BASE_URL}/v1/chat/completions",
+            headers=headers,
+            json=payload
         )
         
-        # Generate explanations and predictions
-        mechanistic_explanations = []
-        biomarker_predictions = []
-        toxicity_predictions = []
+        if response.status_code != 200:
+            raise HTTPException(status_code=response.status_code, detail="LLM API request failed")
         
-        for pair in target_pairs:
-            # Get mechanistic explanation
-            explanation = model.generate_mechanistic_explanation(
-                target_pair=(pair["target1"], pair["target2"]),
-                indication=request.indication
-            )
-            mechanistic_explanations.append(explanation)
-            
-            # Predict biomarkers
-            biomarkers = model.predict_biomarkers(
-                target_pair=(pair["target1"], pair["target2"]),
-                indication=request.indication
-            )
-            biomarker_predictions.append(biomarkers)
-            
-            # Predict toxicity
-            toxicity = model.predict_toxicity(
-                target_pair=(pair["target1"], pair["target2"]),
-                tissue_specificity=request.tissue_specificity or {}
-            )
-            toxicity_predictions.append(toxicity)
-        
-        return TargetPairResponse(
-            target_pairs=target_pairs,
-            mechanistic_explanations=mechanistic_explanations,
-            biomarker_predictions=biomarker_predictions,
-            toxicity_predictions=toxicity_predictions
-        )
-        
+        # Extract the explanation from the response
+        explanation = response.json()["choices"][0]["message"]["content"]
+        return {"explanation": explanation}
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # Fallback to a template-based explanation if the API fails
+        return {
+            "explanation": f"""The target pair {request.target1} and {request.target2} shows promise 
+            for treating {request.indication} in {request.patient_population} patients. This combination 
+            targets complementary pathways in the disease mechanism, potentially leading to improved 
+            therapeutic outcomes. Further research is needed to validate these findings."""
+        }
 
 @app.get("/health")
 async def health_check():
-    """
-    Health check endpoint.
-    """
     return {"status": "healthy"}
 
 if __name__ == "__main__":
