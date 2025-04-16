@@ -24,7 +24,7 @@ OREN combines Graph Neural Networks (GNN), Reinforcement Learning (RL), and meta
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/oren.git
+git clone https://github.com/gavrielhan/oren.git
 cd oren
 
 # Create a virtual environment
