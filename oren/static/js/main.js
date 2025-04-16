@@ -1,17 +1,29 @@
 document.addEventListener('DOMContentLoaded', function() {
-    // DOM Elements
+    console.log('DOM Content Loaded');
+    
+    // Get DOM elements
     const searchForm = document.getElementById('searchForm');
-    const indicationSelect = document.getElementById('indication');
+    const diseaseIndicationSelect = document.getElementById('diseaseIndication');
     const patientPopulationSelect = document.getElementById('patientPopulation');
     const clinicalPhenotypeSelect = document.getElementById('clinicalPhenotype');
-    const strategySelect = document.getElementById('strategy');
+    const targetingStrategySelect = document.getElementById('targetingStrategy');
     const loadingIndicator = document.getElementById('loadingIndicator');
     const resultsContainer = document.getElementById('resultsContainer');
     const resultsBody = document.getElementById('resultsBody');
-    const noResultsMessage = document.getElementById('noResults');
     const explanationModal = new bootstrap.Modal(document.getElementById('explanationModal'));
     const explanationContent = document.getElementById('explanationContent');
     const explanationLoading = document.getElementById('explanationLoading');
+
+    console.log('Form elements:', {
+        searchForm: searchForm,
+        diseaseIndicationSelect: diseaseIndicationSelect,
+        patientPopulationSelect: patientPopulationSelect,
+        clinicalPhenotypeSelect: clinicalPhenotypeSelect,
+        targetingStrategySelect: targetingStrategySelect,
+        loadingIndicator: loadingIndicator,
+        resultsContainer: resultsContainer,
+        resultsBody: resultsBody
+    });
 
     // Disease options data
     const diseaseOptions = {
@@ -34,10 +46,10 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     // Update dropdowns based on selected disease
-    indicationSelect.addEventListener('change', function() {
+    diseaseIndicationSelect.addEventListener('change', function() {
         const selectedDisease = this.value;
         const options = diseaseOptions[selectedDisease] || { populations: [], phenotypes: [] };
-
+        
         // Update patient population dropdown
         patientPopulationSelect.innerHTML = '<option value="">Select a patient population...</option>';
         options.populations.forEach(population => {
@@ -47,7 +59,7 @@ document.addEventListener('DOMContentLoaded', function() {
             patientPopulationSelect.appendChild(option);
         });
         patientPopulationSelect.disabled = !selectedDisease;
-
+        
         // Update clinical phenotype dropdown
         clinicalPhenotypeSelect.innerHTML = '<option value="">Select a clinical phenotype...</option>';
         options.phenotypes.forEach(phenotype => {
@@ -59,26 +71,28 @@ document.addEventListener('DOMContentLoaded', function() {
         clinicalPhenotypeSelect.disabled = !selectedDisease;
     });
 
-    // Form submission handler
+    // Handle form submission
     searchForm.addEventListener('submit', async function(e) {
+        console.log('Form submitted');
         e.preventDefault();
         
-        // Show loading indicator
+        // Show loading indicator and hide results
         loadingIndicator.classList.remove('d-none');
         resultsContainer.classList.add('d-none');
-        resultsBody.innerHTML = '';
-        noResultsMessage.classList.add('d-none');
-
-        // Get form values
+        
+        // Get form values - match the field names expected by the API
         const formData = {
-            disease_indication: indicationSelect.value,
+            indication: diseaseIndicationSelect.value,
             patient_population: patientPopulationSelect.value,
             clinical_phenotype: clinicalPhenotypeSelect.value,
-            targeting_strategy: strategySelect.value
+            targeting_strategy: targetingStrategySelect.value
         };
-
+        
+        console.log('Form data:', formData);
+        
         try {
-            // Make API request
+            console.log('Making API request...');
+            // Make API call to get target pairs
             const response = await fetch('/api/rank_target_pairs', {
                 method: 'POST',
                 headers: {
@@ -86,32 +100,38 @@ document.addEventListener('DOMContentLoaded', function() {
                 },
                 body: JSON.stringify(formData)
             });
-
-            if (!response.ok) {
-                throw new Error('API request failed');
-            }
-
-            const data = await response.json();
             
-            // Hide loading indicator
-            loadingIndicator.classList.add('d-none');
-
-            // Display results
-            if (data.target_pairs && data.target_pairs.length > 0) {
-                displayResults(data.target_pairs);
-            } else {
-                noResultsMessage.classList.remove('d-none');
+            console.log('API response:', response);
+            
+            if (!response.ok) {
+                throw new Error('Failed to fetch results');
             }
+            
+            const data = await response.json();
+            console.log('API data:', data);
+            
+            // Display results
+            displayResults(data.target_pairs);
+            resultsContainer.classList.remove('d-none');
+            
         } catch (error) {
             console.error('Error:', error);
+            resultsBody.innerHTML = `
+                <tr>
+                    <td colspan="4" class="text-center text-danger">
+                        An error occurred while fetching results. Please try again.
+                    </td>
+                </tr>
+            `;
+            resultsContainer.classList.remove('d-none');
+        } finally {
             loadingIndicator.classList.add('d-none');
-            noResultsMessage.classList.remove('d-none');
-            noResultsMessage.innerHTML = '<p>An error occurred while fetching results. Please try again.</p>';
         }
     });
 
-    // Display results in table
+    // Function to display results
     function displayResults(targetPairs) {
+        console.log('Displaying results:', targetPairs);
         resultsBody.innerHTML = '';
         
         if (targetPairs.length === 0) {
@@ -128,7 +148,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <td class="${getScoreClass(pair.synergy_score)}">${pair.synergy_score}</td>
                     <td class="${getScoreClass(pair.toxicity_score)}">${pair.toxicity_score}</td>
                     <td>
-                        <button class="btn btn-sm btn-outline-primary" onclick="showExplanation('${pair.target1}', '${pair.target2}', '${indicationSelect.value}')">
+                        <button class="btn btn-sm btn-outline-primary" onclick="showExplanation('${pair.target1}', '${pair.target2}', '${diseaseIndicationSelect.value}')">
                             Explain
                         </button>
                     </td>
@@ -136,23 +156,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 resultsBody.appendChild(row);
             });
         }
-        
-        resultsContainer.classList.remove('d-none');
     }
 
-    // Get CSS class based on score
+    // Function to get score class
     function getScoreClass(score) {
         if (score >= 0.7) return 'score-high';
         if (score >= 0.4) return 'score-medium';
         return 'score-low';
     }
 
-    // Show explanation modal
+    // Function to show explanation
     window.showExplanation = async function(target1, target2, indication) {
+        console.log('Showing explanation for:', { target1, target2, indication });
         explanationLoading.classList.remove('d-none');
         explanationContent.classList.add('d-none');
         explanationModal.show();
-
+        
         try {
             const response = await fetch('/api/explain', {
                 method: 'POST',
@@ -162,16 +181,30 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify({
                     target1: target1,
                     target2: target2,
-                    indication: indication
+                    indication: indication,
+                    patient_population: patientPopulationSelect.value,
+                    clinical_phenotype: clinicalPhenotypeSelect.value
                 })
             });
-
+            
             if (!response.ok) {
-                throw new Error('API request failed');
+                throw new Error('Failed to fetch explanation');
             }
-
+            
             const data = await response.json();
-            explanationContent.innerHTML = data.explanation.replace(/\n/g, '<br>');
+            
+            // Format the explanation text
+            let formattedExplanation = data.explanation
+                // Replace markdown-style headers with HTML headers
+                .replace(/###\s*(.*?)(?:\n|$)/g, '<h3>$1</h3>')
+                .replace(/\*\*\*(.*?)\*\*\*/g, '<h4>$1</h4>')
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                // Replace newlines with <br> tags
+                .replace(/\n/g, '<br>');
+            
+            explanationContent.innerHTML = formattedExplanation;
+            
         } catch (error) {
             console.error('Error:', error);
             explanationContent.innerHTML = 'Failed to generate explanation. Please try again.';

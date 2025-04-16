@@ -19,8 +19,8 @@
             <div class="card-body">
                 <form id="searchForm">
                     <div class="mb-3">
-                        <label for="indication" class="form-label">Disease Indication</label>
-                        <select class="form-select" id="indication" name="indication" required>
+                        <label for="diseaseIndication" class="form-label">Disease Indication</label>
+                        <select class="form-select" id="diseaseIndication" name="diseaseIndication" required>
                             <option value="">Select a disease...</option>
                             <option value="breast_cancer">Breast Cancer</option>
                             <option value="diabetes">Diabetes</option>
@@ -44,8 +44,8 @@
                     </div>
 
                     <div class="mb-3">
-                        <label for="strategy" class="form-label">Targeting Strategy</label>
-                        <select class="form-select" id="strategy" name="strategy" required>
+                        <label for="targetingStrategy" class="form-label">Targeting Strategy</label>
+                        <select class="form-select" id="targetingStrategy" name="targetingStrategy" required>
                             <option value="">Select a strategy...</option>
                             <option value="dual_inhibition">Dual Inhibition</option>
                             <option value="sequential_therapy">Sequential Therapy</option>
@@ -58,33 +58,27 @@
             </div>
         </div>
 
-        <div id="results" class="card d-none">
-            <div class="card-body">
-                <div id="loading" class="text-center d-none">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                    <p class="mt-2">Analyzing potential target pairs...</p>
-                </div>
+        <div id="loadingIndicator" class="text-center d-none">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Analyzing potential target pairs...</p>
+        </div>
 
-                <div id="resultsContent">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Target 1</th>
-                                <th>Target 2</th>
-                                <th>Synergy Score <i class="bi bi-arrow-down-up sort-icon" data-sort="synergy"></i></th>
-                                <th>Toxicity Score <i class="bi bi-arrow-down-up sort-icon" data-sort="toxicity"></i></th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="resultsBody">
-                        </tbody>
-                    </table>
-                    <div id="noResults" class="text-center d-none">
-                        <p>No target pairs found for the given criteria.</p>
-                    </div>
-                </div>
+        <div id="resultsContainer" class="card d-none">
+            <div class="card-body">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Target Pair</th>
+                            <th data-sort="synergy">Synergy Score</th>
+                            <th data-sort="toxicity">Toxicity Score</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultsBody">
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>

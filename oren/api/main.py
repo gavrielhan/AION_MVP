@@ -89,7 +89,7 @@ async def explain_target_pair(request: ExplanationRequest):
         prompt = f"""Explain why the target pair {request.target1} and {request.target2} 
         would be effective for treating {request.indication} in {request.patient_population} 
         patients with {request.clinical_phenotype}. Include mechanistic rationale and 
-        potential benefits."""
+        potential benefits. Explain clearly teh pathways involved and teh possible downstream effects, clealry defining the main advantages of using these 2 targets"""
 
         # Prepare the API request
         headers = {
@@ -98,7 +98,7 @@ async def explain_target_pair(request: ExplanationRequest):
         }
         
         payload = {
-            "model": "gpt-4",
+            "model": "gpt-4o",
             "messages": [
                 {"role": "system", "content": "You are a biomedical expert explaining drug target pairs."},
                 {"role": "user", "content": prompt}
@@ -109,23 +109,36 @@ async def explain_target_pair(request: ExplanationRequest):
         response = requests.post(
             f"{API_BASE_URL}/v1/chat/completions",
             headers=headers,
-            json=payload
+            json=payload,
+            timeout=60  # Set a longer timeout (60 seconds)
         )
         
+        # Check if the response is successful
         if response.status_code != 200:
-            raise HTTPException(status_code=response.status_code, detail="LLM API request failed")
+            error_detail = f"LLM API request failed with status code {response.status_code}"
+            try:
+                error_json = response.json()
+                if "error" in error_json:
+                    error_detail += f": {error_json['error']}"
+            except:
+                pass
+            raise HTTPException(status_code=response.status_code, detail=error_detail)
         
         # Extract the explanation from the response
         explanation = response.json()["choices"][0]["message"]["content"]
         return {"explanation": explanation}
 
-    except Exception as e:
-        # Fallback to a template-based explanation if the API fails
+    except requests.exceptions.Timeout:
+        # Handle timeout specifically
         return {
-            "explanation": f"""The target pair {request.target1} and {request.target2} shows promise 
-            for treating {request.indication} in {request.patient_population} patients. This combination 
-            targets complementary pathways in the disease mechanism, potentially leading to improved 
-            therapeutic outcomes. Further research is needed to validate these findings."""
+            "explanation": f"The request to generate an explanation for {request.target1} and {request.target2} timed out. Please try again later."
+        }
+    except Exception as e:
+        # Log the error for debugging
+        print(f"Error generating explanation: {str(e)}")
+        # Return a more informative error message
+        return {
+            "explanation": f"An error occurred while generating the explanation: {str(e)}"
         }
 
 @app.get("/health")
