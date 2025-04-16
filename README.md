@@ -24,12 +24,12 @@ OREN combines Graph Neural Networks (GNN), Reinforcement Learning (RL), and meta
 
 ```bash
 # Clone the repository
-git clone https://github.com/gavrielhan/oren.git
-cd oren
+git clone https://github.com/gavrielhan/AION_MVP.git
+cd AION_MVP
 
 # Create a virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+conda create -n AION python=3.9 -y
+conda activate AION
 
 # Install dependencies
 pip install -r requirements.txt
